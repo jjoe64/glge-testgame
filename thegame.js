@@ -2,193 +2,267 @@
  * @author jonas
  */
 
-var gameScene;
-var doc = new GLGE.Document();
-doc.onLoad=function(){
-	//create the renderer
-	var gameRenderer=new GLGE.Renderer(document.getElementById('canvas'));
-	gameScene=new GLGE.Scene();
-	gameScene=doc.getElement("scene");
-	gameRenderer.setScene(gameScene);
+var TestGame = {};
 
-	var mouse=new GLGE.MouseInput(document.getElementById('canvas'));
-	var keys=new GLGE.KeyInput();
+TestGame.System = function() {
+	this.scene = null;
+	this.doc = new GLGE.Document();
+	this.renderer = null;
+	this.controller = null;
+	
+	var thiz = this;
+	
+	this.doc.onLoad = function() {
+		//create the renderer
+		thiz.renderer=new GLGE.Renderer(document.getElementById('canvas'));
+		//MACHT KEIN SINN: thiz.scene=new GLGE.Scene();
+		thiz.scene=thiz.doc.getElement("scene");
+		thiz.renderer.setScene(thiz.scene);
+	
+		thiz.controller = new TestGame.Controller(thiz);
+	
+		thiz.doc.getElement("OBCircle").pickable=false;
+		
+		// main loop
+		function mainLoop(){
+			thiz.controller.process();
+			thiz.renderer.render();
+			requestAnimationFrame(mainLoop);
+		}
+		mainLoop();
 
-	doc.getElement("OBCircle").pickable=false;
+	};
+	
+	// let's go
+	// Preloader configurations are optional. They improve the accuracy of the preloader.
+	var preloaderConfiguration1 = {XMLQuota: 0.13, numXMLFiles: 1}; // Example 1 (active)
+	var preloaderConfiguration2 = {XMLQuota: 0.30, XMLBytes: 852605}; // Example 2 
+	
+	this.doc.load("plat.xml", preloaderConfiguration1);
+	// alternative: doc.load("plat.xml", preloaderConfiguration2);
+	// alternative: doc.load("plat.xml", true);
+	// alternative: doc.load("plat.xml"); // In this case you may not use the preloader gui because preloading is disabled.
+	
+	GLGE.GUI.useLibrary("jQuery"); // use the jQuery progress-bar
+	
+	var preloaderGUI = new GLGE.GUI.Preloader(); // use the preloader gui-gadget to display the progress
+	preloaderGUI.setDocumentLoader(this.doc.preloader);
+	preloaderGUI.addToDOM(document.getElementById('container'));
 
-	var manstate="stand";
-	var manvel=[0,0,0];
-	var manpos=[0,0,45];
-	var manrot=0;
-	var manrotvel=0;
-	var armatue=doc.getElement("AMArmature");
-	var manwalk=doc.getElement("ACArmature_walk");
-	var manjump=doc.getElement("ACArmature_Jump");
-	var manwalkback=doc.getElement("ACArmature_walkback");
-	var manstand=doc.getElement("ACArmature_stand");
-	var manland=doc.getElement("ACArmature_Land");
-	var manfly=doc.getElement("ACArmature_Fly");
-	var mantime=0;
+};
 
-	function manlogic(){
-		var matrix=armatue.getModelMatrix();
-		incx=matrix[0];
-		incy=matrix[4];
-		var time=(new Date()).getTime();
-		var dt=(time-mantime)/1000;
-		
-		var camera=gameScene.camera;
-		var position=camera.getPosition();
-		
-		if(dt<1){
-			target=[manpos[0]-incx*40,manpos[1]-incy*40,manpos[2]+20];
-			camera.setLocX(position.x+(target[0]-position.x)*dt);
-			camera.setLocY(position.y+(target[1]-position.y)*dt);
-			camera.setLocZ(position.z+(target[2]-position.z)*dt);
-			camera.Lookat([manpos[0],manpos[1],manpos[2]+7]);
+
+TestGame.Controller = function(system) {
+	this.system = system;
+	this.mouse = new GLGE.MouseInput(document.getElementById('canvas'));
+	this.keys = new GLGE.KeyInput();
+	this.thePlayer = new TestGame.ThePlayer(system.scene, system.doc);
+};
+TestGame.Controller.prototype.process = function() {
+	// jump
+	if (this.keys.isKeyPressed(GLGE.KI_SPACE)) {
+		this.thePlayer.jump();
+	}
+	
+	// move forward & stop
+	if (this.keys.isKeyPressed(GLGE.KI_UP_ARROW)) {
+		this.thePlayer.walk();
+	} else {
+		this.thePlayer.standIfWalk();
+	}
+
+	// move backward & stop
+	if (this.keys.isKeyPressed(GLGE.KI_DOWN_ARROW)) {
+		this.thePlayer.walkBack();
+	} else {
+		this.thePlayer.standIfWalkBack();
+	}
+	
+	if (this.keys.isKeyPressed(GLGE.KI_LEFT_ARROW)) {
+		this.thePlayer.turnLeft();
+	} else if(this.keys.isKeyPressed(GLGE.KI_RIGHT_ARROW)) {
+		this.thePlayer.turnRight();
+	} else {
+		this.thePlayer.standIfTurn();
+	}
+	
+	// process players
+	this.thePlayer.process();
+};
+
+
+TestGame.ThePlayer = function(scene, doc) {
+	this.scene = scene;
+	this.manstate="stand";
+	this.manvel=[0,0,0];
+	this.manpos=[0,0,45];
+	this.manrot=0;
+	this.manrotvel=0;
+	this.armatue=doc.getElement("AMArmature");
+	this.manwalk=doc.getElement("ACArmature_walk");
+	this.manjump=doc.getElement("ACArmature_Jump");
+	this.manwalkback=doc.getElement("ACArmature_walkback");
+	this.manstand=doc.getElement("ACArmature_stand");
+	this.manland=doc.getElement("ACArmature_Land");
+	this.manfly=doc.getElement("ACArmature_Fly");
+	this.mantime=0;
+	this.incx = 0;
+	this.incy = 0;
+	this.dt = 0;
+	
+
+	thiz = this;
+	this.jumplistener=function(data){
+		thiz.armatue.setAction(thiz.manfly,200,true);
+	};
+	this.landlistener=function(data){
+		if(thiz.manstate!="stand"){
+			thiz.armatue.setAction(thiz.manstand,200,true);
+			thiz.manstate="stand";
+			thiz.manvel=[0,0,0];
 		}
-				
-		if(keys.isKeyPressed(GLGE.KI_SPACE)){
-			if(manstate!="jump" && manstate!="land"){
-				manstate="jump";
-				armatue.setAction(manjump,150);
-				manvel=[15*incx,15*incy,50];
-			}
+	}
+
+	this.manland.addEventListener("animFinished", this.landlistener);
+	this.manjump.addEventListener("animFinished", this.jumplistener);
+};
+TestGame.ThePlayer.prototype.jump = function() {
+	if (this.manstate!="jump" && this.manstate!="land"){
+		this.manstate="jump";
+		this.armatue.setAction(this.manjump,150);
+		this.manvel=[15*this.incx,15*this.incy,50];
+	}
+};
+TestGame.ThePlayer.prototype.walk = function() {
+	if (this.manstate!="jump" && this.manstate!="land") {
+		if(this.manstate!="walk"){
+			this.manstate="walk";
+			this.armatue.setAction(this.manwalk,150,true);
+			this.manvel=[25*this.incx,25*this.incy,0];
 		}
-		
-		if(keys.isKeyPressed(GLGE.KI_UP_ARROW) && manstate!="jump" && manstate!="land"){
-			if(manstate!="walk"){
-				manstate="walk";
-				armatue.setAction(manwalk,150,true);
-				manvel=[25*incx,25*incy,0];
-			}
-		}else if(keys.isKeyPressed(GLGE.KI_UP_ARROW) && (manstate=="jump" || manstate=="land")){
-			manvel[0]=manvel[0]+20*incx*dt;
-			manvel[1]=manvel[1]+20*incy*dt;
-		}else if(manstate=="walk"){
-			manstate="stand";
-			armatue.setAction(manstand,150,true);
-			manvel=[0,0,0];
+	}else if (this.manstate=="jump" || this.manstate=="land") {
+		this.manvel[0]=this.manvel[0]+20*this.incx*this.dt;
+		this.manvel[1]=this.manvel[1]+20*this.incy*this.dt;
+	}
+};
+TestGame.ThePlayer.prototype.standIfWalk = function() {
+	if (this.manstate=="walk") {
+		this.manstate="stand";
+		this.armatue.setAction(this.manstand,150,true);
+		this.manvel=[0,0,0];
+	}
+};
+TestGame.ThePlayer.prototype.walkBack = function() {
+	if (this.manstate != "jump" && this.manstate!="walkback") {
+		this.manstate="walkback";
+		this.armatue.setAction(this.manwalkback,150,true);
+		this.manvel=[-15*this.incx,-15*this.incy,0];
+	}
+};
+TestGame.ThePlayer.prototype.standIfWalkBack = function() {
+	if(this.manstate=="walkback"){
+		this.manstate="stand";
+		this.armatue.setAction(this.manstand,150,true);
+		this.manvel=[0,0,0];
+	}
+};
+TestGame.ThePlayer.prototype.turnLeft = function() {
+	if (this.manstate!="jump") {
+		if(this.manstate!="walk" && this.manrotvel==0){
+			this.manstate="turn";
+			this.manvel=[0,0,0];
+			this.armatue.setAction(this.manwalk,150,true);
+		}else if(this.manstate=="walk"){
+			this.manvel=[10*this.incx,10*this.incy,0];
 		}
-		if(keys.isKeyPressed(GLGE.KI_DOWN_ARROW) && manstate!="jump"){
-			if(manstate!="walkback"){
-				manstate="walkback";
-				armatue.setAction(manwalkback,150,true);
-				manvel=[-15*incx,-15*incy,0];
-			}
-		}else if(manstate=="walkback"){
-			manstate="stand";
-			armatue.setAction(manstand,150,true);
-			manvel=[0,0,0];
+		if(this.manstate!="walkback"){
+			this.manrotvel=3;
 		}
-		
-		if(keys.isKeyPressed(GLGE.KI_LEFT_ARROW) && manstate!="jump"){
-			if(manstate!="walk" && manrotvel==0){
-				manstate="turn";
-				manvel=[0,0,0];
-				armatue.setAction(manwalk,150,true);
-			}else if(manstate=="walk"){
-				manvel=[10*incx,10*incy,0];
-			}
-			if(manstate!="walkback"){
-				manrotvel=3;
-			}
-		}else if(keys.isKeyPressed(GLGE.KI_RIGHT_ARROW) && manstate!="jump"){
-			if(manstate!="walk" && manrotvel==0){
-				manstate="turn";
-				manvel=[0,0,0];
-				armatue.setAction(manwalk,150,true);
-			}else if(manstate=="walk"){
-				manvel=[10*incx,10*incy,0];
-			}
-			if(manstate!="walkback"){
-				manrotvel=-3;
-			}
-		}else{
-			if(manstate=="turn"){
-				armatue.setAction(manstand,150,true);
-				manvel=[0,0,0];
-			}
-			manrotvel=0;
+	}
+};
+TestGame.ThePlayer.prototype.turnRight = function() {
+	if (this.manstate!="jump"){
+		if(this.manstate!="walk" && this.manrotvel==0){
+			this.manstate="turn";
+			this.manvel=[0,0,0];
+			this.armatue.setAction(this.manwalk,150,true);
+		}else if(this.manstate=="walk"){
+			this.manvel=[10*this.incx,10*this.incy,0];
 		}
-		
-		if(manvel[0]>0 || manvel[1]>0){
-			var dirtotal=Math.sqrt(manvel[0]*manvel[0]+manvel[1]*manvel[1]);
-			var dirx=manvel[0]/dirtotal;
-			var diry=manvel[1]/dirtotal;
-			xdist=gameScene.ray([manpos[0],manpos[1],manpos[2]-6],[-dirx,-diry,0]);
-			xdist=((xdist.distance*100)|0)/100;
-			if(xdist<3 && xdist>0){
-				manvel[0]=0;
-				manvel[1]=0;
-			}
+		if(this.manstate!="walkback"){
+			this.manrotvel=-3;
 		}
-		
-		if(mantime>0){
-			mantime=time;
-			manpos[0]=manpos[0]+manvel[0]*dt;
-			manpos[1]=manpos[1]+manvel[1]*dt;
-			manpos[2]=manpos[2]+manvel[2]*dt;
-			manrot=manrot+manrotvel*dt;
-			armatue.setLocX(manpos[0]);
-			armatue.setLocY(manpos[1]);
-			armatue.setLocZ(manpos[2]);
-			armatue.setRotZ(manrot);
-			zdist=gameScene.ray([manpos[0],manpos[1],manpos[2]],[0,0,1]);
-            if(zdist != null){
+	}
+};
+TestGame.ThePlayer.prototype.standIfTurn = function() {
+	if (this.manstate=="turn"){
+		this.armatue.setAction(this.manstand,150,true);
+		this.manvel=[0,0,0];
+	}
+	this.manrotvel=0;
+};
+TestGame.ThePlayer.prototype.process = function() {
+	var matrix=this.armatue.getModelMatrix();
+	this.incx=matrix[0];
+	this.incy=matrix[4];
+	var time=(new Date()).getTime();
+	this.dt=(time-this.mantime)/1000;
+	
+	var camera = this.scene.camera;
+	var position = camera.getPosition();
+	
+	if (this.dt<1) {
+		var target=[this.manpos[0]-this.incx*40, this.manpos[1]-this.incy*40, this.manpos[2]+20];
+		camera.setLocX(position.x+(target[0]-position.x)*this.dt);
+		camera.setLocY(position.y+(target[1]-position.y)*this.dt);
+		camera.setLocZ(position.z+(target[2]-position.z)*this.dt);
+		camera.Lookat([this.manpos[0], this.manpos[1], this.manpos[2]+7]);
+	}
+
+	
+	if (this.manvel[0]>0 || this.manvel[1]>0) {
+		var dirtotal=Math.sqrt(this.manvel[0]*this.manvel[0]+this.manvel[1]*this.manvel[1]);
+		var dirx=this.manvel[0]/dirtotal;
+		var diry=this.manvel[1]/dirtotal;
+		var xdist=this.scene.ray([this.manpos[0], this.manpos[1], this.manpos[2]-6],[-dirx,-diry,0]);
+		xdist=((xdist.distance*100)|0)/100;
+		if(xdist<3 && xdist>0){
+			this.manvel[0]=0;
+			this.manvel[1]=0;
+		}
+	}
+	
+	if (this.mantime>0){
+		this.mantime=time;
+		this.manpos[0]=this.manpos[0]+this.manvel[0]*this.dt;
+		this.manpos[1]=this.manpos[1]+this.manvel[1]*this.dt;
+		this.manpos[2]=this.manpos[2]+this.manvel[2]*this.dt;
+		this.manrot=this.manrot+this.manrotvel*this.dt;
+		this.armatue.setLocX(this.manpos[0]);
+		this.armatue.setLocY(this.manpos[1]);
+		this.armatue.setLocZ(this.manpos[2]);
+		this.armatue.setRotZ(this.manrot);
+		var zdist=this.scene.ray([this.manpos[0], this.manpos[1], this.manpos[2]],[0,0,1]);
+		if (zdist != null){
 			zdist=((zdist.distance*100)|0)/100;
 			if(zdist>7.81){
-				manvel[2]=manvel[2]-70*dt;
-			}else if(zdist<7.81){
-				manpos[2]=manpos[2]+(7.81-zdist);
-				manstate="land";
-				armatue.setAction(manland,150);
-				manvel=[15*incx,15*incy,0];
+				this.manvel[2]=this.manvel[2]-70*this.dt;
+			}else if(this.zdist<7.81){
+				this.manpos[2]=this.manpos[2]+(7.81-zdist);
+				this.manstate="land";
+				this.armatue.setAction(this.manland,150);
+				this.manvel=[15*this.incx,15*this.incy,0];
 			}
-            }
-            else{
-            	manpos[2]=manpos[2]+(7.81-zdist);
-				manstate="land";
-				armatue.setAction(manland,150);
-				manvel=[15*incx,15*incy,0];
-            }
-		}else{
-			mantime=(new Date()).getTime();
+		} else {
+			this.manpos[2]=this.manpos[2]+(7.81-zdist);
+			this.manstate="land";
+			this.armatue.setAction(this.manland,150);
+			this.manvel=[15*this.incx,15*this.incy,0];
 		}
+	} else {
+		this.mantime=(new Date()).getTime();
 	}
+};
 
-	var jumplistener=function(data){
-		armatue.setAction(manfly,200,true);
-	};
-	var landlistener=function(data){
-		if(manstate!="stand"){
-			armatue.setAction(manstand,200,true);
-			manstate="stand";
-			manvel=[0,0,0];
-		}
-	}
+TestGame.System();
 
-	manland.addEventListener("animFinished",landlistener);	
-	manjump.addEventListener("animFinished",jumplistener);
-
-	function render(){
-		manlogic();
-		gameRenderer.render();
-		requestAnimationFrame(render);
-	}
-	render();
-}
-// Preloader configurations are optional. They improve the accuracy of the preloader.
-var preloaderConfiguration1 = {XMLQuota: 0.13, numXMLFiles: 1}; // Example 1 (active)
-var preloaderConfiguration2 = {XMLQuota: 0.30, XMLBytes: 852605}; // Example 2 
-
-doc.load("plat.xml", preloaderConfiguration1);
-// alternative: doc.load("plat.xml", preloaderConfiguration2);
-// alternative: doc.load("plat.xml", true);
-// alternative: doc.load("plat.xml"); // In this case you may not use the preloader gui because preloading is disabled.
-
-GLGE.GUI.useLibrary("jQuery"); // use the jQuery progress-bar
-
-var preloaderGUI = new GLGE.GUI.Preloader(); // use the preloader gui-gadget to display the progress
-preloaderGUI.setDocumentLoader(doc.preloader);
-preloaderGUI.addToDOM(document.getElementById('container'));
