@@ -14,9 +14,9 @@ TestGame.System = function() {
 	
 	this.doc.onLoad = function() {
 		//create the renderer
-		thiz.renderer=new GLGE.Renderer(document.getElementById('canvas'));
+		thiz.renderer = new GLGE.Renderer(document.getElementById('canvas'));
 		//MACHT KEIN SINN: thiz.scene=new GLGE.Scene();
-		thiz.scene=thiz.doc.getElement("scene");
+		thiz.scene = thiz.doc.getElement("scene");
 		thiz.renderer.setScene(thiz.scene);
 	
 		thiz.controller = new TestGame.Controller(thiz);
@@ -59,6 +59,9 @@ TestGame.Controller = function(system) {
 	this.thePlayer = new TestGame.ThePlayer(system.scene, system.doc);
 };
 TestGame.Controller.prototype.process = function() {
+	// preprocess players
+	this.thePlayer.preProcess();
+	
 	// jump
 	if (this.keys.isKeyPressed(GLGE.KI_SPACE)) {
 		this.thePlayer.jump();
@@ -109,6 +112,7 @@ TestGame.ThePlayer = function(scene, doc) {
 	this.incx = 0;
 	this.incy = 0;
 	this.dt = 0;
+	this.time = 0;
 	
 
 	thiz = this;
@@ -201,12 +205,12 @@ TestGame.ThePlayer.prototype.standIfTurn = function() {
 	}
 	this.manrotvel=0;
 };
-TestGame.ThePlayer.prototype.process = function() {
+TestGame.ThePlayer.prototype.preProcess = function() {
 	var matrix=this.armatue.getModelMatrix();
 	this.incx=matrix[0];
 	this.incy=matrix[4];
-	var time=(new Date()).getTime();
-	this.dt=(time-this.mantime)/1000;
+	this.time=(new Date()).getTime();
+	this.dt=(this.time-this.mantime)/1000;
 	
 	var camera = this.scene.camera;
 	var position = camera.getPosition();
@@ -218,8 +222,8 @@ TestGame.ThePlayer.prototype.process = function() {
 		camera.setLocZ(position.z+(target[2]-position.z)*this.dt);
 		camera.Lookat([this.manpos[0], this.manpos[1], this.manpos[2]+7]);
 	}
-
-	
+};
+TestGame.ThePlayer.prototype.process = function() {
 	if (this.manvel[0]>0 || this.manvel[1]>0) {
 		var dirtotal=Math.sqrt(this.manvel[0]*this.manvel[0]+this.manvel[1]*this.manvel[1]);
 		var dirx=this.manvel[0]/dirtotal;
@@ -233,7 +237,7 @@ TestGame.ThePlayer.prototype.process = function() {
 	}
 	
 	if (this.mantime>0){
-		this.mantime=time;
+		this.mantime=this.time;
 		this.manpos[0]=this.manpos[0]+this.manvel[0]*this.dt;
 		this.manpos[1]=this.manpos[1]+this.manvel[1]*this.dt;
 		this.manpos[2]=this.manpos[2]+this.manvel[2]*this.dt;
@@ -247,7 +251,7 @@ TestGame.ThePlayer.prototype.process = function() {
 			zdist=((zdist.distance*100)|0)/100;
 			if(zdist>7.81){
 				this.manvel[2]=this.manvel[2]-70*this.dt;
-			}else if(this.zdist<7.81){
+			}else if(zdist<7.81){
 				this.manpos[2]=this.manpos[2]+(7.81-zdist);
 				this.manstate="land";
 				this.armatue.setAction(this.manland,150);
