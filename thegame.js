@@ -2,8 +2,13 @@
  * @author jonas
  */
 
+// namespace
 var TestGame = {};
 
+
+/**
+ * System
+ */
 TestGame.System = function() {
 	this.scene = null;
 	this.doc = new GLGE.Document();
@@ -52,6 +57,10 @@ TestGame.System = function() {
 };
 
 
+/**
+ * Controller
+ * handle hardware input
+ */
 TestGame.Controller = function(system) {
 	this.system = system;
 	this.mouse = new GLGE.MouseInput(document.getElementById('canvas'));
@@ -94,7 +103,26 @@ TestGame.Controller.prototype.process = function() {
 };
 
 
-TestGame.ThePlayer = function(scene, doc) {
+/**
+ * Interface IPersonController
+ */
+TestGame.IPersonController = function() {};
+TestGame.IPersonController.jump = function() {throw "Not implemented";};
+TestGame.IPersonController.walk = function() {throw "Not implemented";};
+TestGame.IPersonController.standIfWalk = function() {throw "Not implemented";};
+TestGame.IPersonController.walkBack = function() {throw "Not implemented";};
+TestGame.IPersonController.standIfWalkBack = function() {throw "Not implemented";};
+TestGame.IPersonController.turnLeft = function() {throw "Not implemented";};
+TestGame.IPersonController.turnRight = function() {throw "Not implemented";};
+TestGame.IPersonController.standIfTurn = function() {throw "Not implemented";};
+TestGame.IPersonController.preProcess = function() {throw "Not implemented";};
+TestGame.IPersonController.process = function() {throw "Not implemented";};
+
+
+/**
+ * Implementation for Third Person Camera
+ */
+TestGame.ThirdPersonController = function(scene, doc) {
 	this.scene = scene;
 	this.manstate="stand";
 	this.manvel=[0,0,0];
@@ -130,14 +158,15 @@ TestGame.ThePlayer = function(scene, doc) {
 	this.manland.addEventListener("animFinished", this.landlistener);
 	this.manjump.addEventListener("animFinished", this.jumplistener);
 };
-TestGame.ThePlayer.prototype.jump = function() {
+TestGame.ThirdPersonController.prototype = new TestGame.IPersonController();
+TestGame.ThirdPersonController.prototype.jump = function() {
 	if (this.manstate!="jump" && this.manstate!="land"){
 		this.manstate="jump";
 		this.armatue.setAction(this.manjump,150);
 		this.manvel=[15*this.incx,15*this.incy,50];
 	}
 };
-TestGame.ThePlayer.prototype.walk = function() {
+TestGame.ThirdPersonController.prototype.walk = function() {
 	if (this.manstate!="jump" && this.manstate!="land") {
 		if(this.manstate!="walk"){
 			this.manstate="walk";
@@ -149,28 +178,28 @@ TestGame.ThePlayer.prototype.walk = function() {
 		this.manvel[1]=this.manvel[1]+20*this.incy*this.dt;
 	}
 };
-TestGame.ThePlayer.prototype.standIfWalk = function() {
+TestGame.ThirdPersonController.prototype.standIfWalk = function() {
 	if (this.manstate=="walk") {
 		this.manstate="stand";
 		this.armatue.setAction(this.manstand,150,true);
 		this.manvel=[0,0,0];
 	}
 };
-TestGame.ThePlayer.prototype.walkBack = function() {
+TestGame.ThirdPersonController.prototype.walkBack = function() {
 	if (this.manstate != "jump" && this.manstate!="walkback") {
 		this.manstate="walkback";
 		this.armatue.setAction(this.manwalkback,150,true);
 		this.manvel=[-30*this.incx,-30*this.incy,0];
 	}
 };
-TestGame.ThePlayer.prototype.standIfWalkBack = function() {
+TestGame.ThirdPersonController.prototype.standIfWalkBack = function() {
 	if(this.manstate=="walkback"){
 		this.manstate="stand";
 		this.armatue.setAction(this.manstand,150,true);
 		this.manvel=[0,0,0];
 	}
 };
-TestGame.ThePlayer.prototype.turnLeft = function() {
+TestGame.ThirdPersonController.prototype.turnLeft = function() {
 	if (this.manstate!="jump") {
 		if(this.manstate!="walk" && this.manrotvel==0){
 			this.manstate="turn";
@@ -184,7 +213,7 @@ TestGame.ThePlayer.prototype.turnLeft = function() {
 		}
 	}
 };
-TestGame.ThePlayer.prototype.turnRight = function() {
+TestGame.ThirdPersonController.prototype.turnRight = function() {
 	if (this.manstate!="jump"){
 		if(this.manstate!="walk" && this.manrotvel==0){
 			this.manstate="turn";
@@ -198,14 +227,14 @@ TestGame.ThePlayer.prototype.turnRight = function() {
 		}
 	}
 };
-TestGame.ThePlayer.prototype.standIfTurn = function() {
+TestGame.ThirdPersonController.prototype.standIfTurn = function() {
 	if (this.manstate=="turn"){
 		this.armatue.setAction(this.manstand,150,true);
 		this.manvel=[0,0,0];
 	}
 	this.manrotvel=0;
 };
-TestGame.ThePlayer.prototype.preProcess = function() {
+TestGame.ThirdPersonController.prototype.preProcess = function() {
 	var matrix=this.armatue.getModelMatrix();
 	this.incx=matrix[0];
 	this.incy=matrix[4];
@@ -225,7 +254,7 @@ TestGame.ThePlayer.prototype.preProcess = function() {
 		camera.Lookat([this.manpos[0], this.manpos[1], this.manpos[2]+7]);
 	}
 };
-TestGame.ThePlayer.prototype.process = function() {
+TestGame.ThirdPersonController.prototype.process = function() {
 	// wall collision detection
 	if (this.manvel[0]>0 || this.manvel[1]>0) {
 		var dirtotal=Math.sqrt(this.manvel[0]*this.manvel[0]+this.manvel[1]*this.manvel[1]);
@@ -277,5 +306,45 @@ TestGame.ThePlayer.prototype.process = function() {
 	}
 };
 
+
+/**
+ * The own Player
+ */
+TestGame.ThePlayer = function(scene, doc) {
+	this.personController = new TestGame.ThirdPersonController(scene, doc);
+};
+TestGame.ThePlayer.prototype.jump = function() {
+	this.personController.jump();
+};
+TestGame.ThePlayer.prototype.walk = function() {
+	this.personController.walk();
+};
+TestGame.ThePlayer.prototype.standIfWalk = function() {
+	this.personController.standIfWalk();
+};
+TestGame.ThePlayer.prototype.walkBack = function() {
+	this.personController.walkBack();
+};
+TestGame.ThePlayer.prototype.standIfWalkBack = function() {
+	this.personController.standIfWalkBack();
+};
+TestGame.ThePlayer.prototype.turnLeft = function() {
+	this.personController.turnLeft();
+};
+TestGame.ThePlayer.prototype.turnRight = function() {
+	this.personController.turnRight();
+};
+TestGame.ThePlayer.prototype.standIfTurn = function() {
+	this.personController.standIfTurn();
+};
+TestGame.ThePlayer.prototype.preProcess = function() {
+	this.personController.preProcess();
+};
+TestGame.ThePlayer.prototype.process = function() {
+	this.personController.process();
+};
+
+
+// start
 TestGame.System();
 
