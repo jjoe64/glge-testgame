@@ -63,9 +63,26 @@ TestGame.System = function() {
  */
 TestGame.Controller = function(system) {
 	this.system = system;
-	this.mouse = new GLGE.MouseInput(document.getElementById('canvas'));
+	//this.mouse = new GLGE.MouseInput(document.getElementById('canvas'));
 	this.keys = new GLGE.KeyInput();
 	this.thePlayer = new TestGame.ThePlayer(system.scene, system.doc);
+	
+	var thiz = this;
+	document.addEventListener("mousemove", function(e) {
+	  var movementX = e.movementX       ||
+                  e.mozMovementX    ||
+                  e.webkitMovementX ||
+                  0,
+      movementY = e.movementY       ||
+                  e.mozMovementY    ||
+                  e.webkitMovementY ||
+                  0;
+                  
+    thiz.thePlayer.personController.moveCamera(movementX, movementY);
+ 
+  // Print the mouse movement delta values
+  //console.log("movementX=" + movementX, "movementY=" + movementY);
+}, false);
 };
 TestGame.Controller.prototype.process = function() {
 	// preprocess players
@@ -120,7 +137,59 @@ TestGame.IPersonController.process = function() {throw "Not implemented";};
 
 
 /**
- * Implementation for Third Person Camera
+ * Implementation for First Person Perspective
+ */
+TestGame.FirstPersonController = function(scene, doc) {
+	this.scene = scene;
+	this.camera = this.scene.camera;
+	this.camera.setLoc(0, 0, 45);
+	this.camera.setRot(1.5, 0, 0);
+	this.rotX = 1.5;
+	this.rotY = 0;
+	this.rotZ = 0;
+}
+TestGame.FirstPersonController.prototype = new TestGame.IPersonController();
+TestGame.FirstPersonController.prototype.jump = function() {};
+TestGame.FirstPersonController.prototype.walk = function() {};
+TestGame.FirstPersonController.prototype.standIfWalk = function() {};
+TestGame.FirstPersonController.prototype.walkBack = function() {};
+TestGame.FirstPersonController.prototype.standIfWalkBack = function() {};
+TestGame.FirstPersonController.prototype.turnLeft = function() {};
+TestGame.FirstPersonController.prototype.turnRight = function() {};
+TestGame.FirstPersonController.prototype.standIfTurn = function() {};
+TestGame.FirstPersonController.prototype.preProcess = function() {};
+TestGame.FirstPersonController.prototype.process = function() {
+	//this.camera.setRot(this.rotX, this.rotY, 0);
+};
+TestGame.FirstPersonController.prototype.moveCamera = function(x, y) {
+	
+		x=x-document.getElementById("container").offsetLeft;
+		y=y-document.getElementById("container").offsetTop;
+		
+		camerarot=this.camera.getRotation();
+		inc=(y-(document.getElementById('canvas').offsetHeight/2))/500;
+		var trans=GLGE.mulMat4Vec4(this.camera.getRotMatrix(),[0,0,-1,1]);
+		var mag=Math.pow(Math.pow(trans[0],2)+Math.pow(trans[1],2),0.5);
+		trans[0]=trans[0]/mag;
+		trans[1]=trans[1]/mag;
+		this.camera.setRotX(1.56-trans[1]*inc);
+		this.camera.setRotZ(-trans[0]*inc);
+		var width=document.getElementById('canvas').offsetWidth;
+		if(x<width*0.3){
+			var turn=Math.pow((x-width*0.3)/(width*0.3),2)*0.005*0.1;
+			this.camera.setRotY(camerarot.y+turn);
+		}
+		if(x>width*0.7){
+			var turn=Math.pow((x-width*0.7)/(width*0.3),2)*0.005*0.1;
+			this.camera.setRotY(camerarot.y-turn);
+		}
+	
+	//this.rotX += 0.01;
+};
+
+
+/**
+ * Implementation for Third Person Perspective
  */
 TestGame.ThirdPersonController = function(scene, doc) {
 	this.scene = scene;
@@ -311,7 +380,8 @@ TestGame.ThirdPersonController.prototype.process = function() {
  * The own Player
  */
 TestGame.ThePlayer = function(scene, doc) {
-	this.personController = new TestGame.ThirdPersonController(scene, doc);
+	//this.personController = new TestGame.ThirdPersonController(scene, doc);
+	this.personController = new TestGame.FirstPersonController(scene, doc);
 };
 TestGame.ThePlayer.prototype.jump = function() {
 	this.personController.jump();
@@ -347,4 +417,63 @@ TestGame.ThePlayer.prototype.process = function() {
 
 // start
 TestGame.System();
+
+
+
+
+
+
+
+
+// Pointer Lock
+var elem;
+ 
+function fullscreenChange() {
+  if (document.webkitFullscreenElement === elem ||
+      document.mozFullscreenElement === elem ||
+      document.mozFullScreenElement === elem) { // Older API upper case 'S'.
+    // Element is fullscreen, now we can request pointer lock
+    elem.requestPointerLock = elem.requestPointerLock    ||
+                              elem.mozRequestPointerLock ||
+                              elem.webkitRequestPointerLock;
+    elem.requestPointerLock();
+  }
+}
+ 
+document.addEventListener('fullscreenchange', fullscreenChange, false);
+document.addEventListener('mozfullscreenchange', fullscreenChange, false);
+document.addEventListener('webkitfullscreenchange', fullscreenChange, false);
+ 
+function pointerLockChange() {
+  if (document.mozPointerLockElement === elem ||
+      document.webkitPointerLockElement === elem) {
+    console.log("Pointer Lock was successful.");
+  } else {
+    console.log("Pointer Lock was lost.");
+  }
+}
+ 
+document.addEventListener('pointerlockchange', pointerLockChange, false);
+document.addEventListener('mozpointerlockchange', pointerLockChange, false);
+document.addEventListener('webkitpointerlockchange', pointerLockChange, false);
+ 
+function pointerLockError() {
+  console.log("Error while locking pointer.");
+}
+ 
+document.addEventListener('pointerlockerror', pointerLockError, false);
+document.addEventListener('mozpointerlockerror', pointerLockError, false);
+document.addEventListener('webkitpointerlockerror', pointerLockError, false);
+ 
+function lockPointer() {
+  elem = document.getElementById('canvas');
+  // Start by going fullscreen with the element.  Current implementations
+  // require the element to be in fullscreen before requesting pointer
+  // lock--something that will likely change in the future.
+  elem.requestFullscreen = elem.requestFullscreen    ||
+                           elem.mozRequestFullscreen ||
+                           elem.mozRequestFullScreen || // Older API upper case 'S'.
+                           elem.webkitRequestFullscreen;
+  elem.requestFullscreen();
+}
 
