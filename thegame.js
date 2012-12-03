@@ -63,7 +63,7 @@ TestGame.System = function() {
  */
 TestGame.Controller = function(system) {
 	this.system = system;
-	//this.mouse = new GLGE.MouseInput(document.getElementById('canvas'));
+	this.mouse = new GLGE.MouseInput(document.getElementById('canvas'));
 	this.keys = new GLGE.KeyInput();
 	this.thePlayer = new TestGame.ThePlayer(system.scene, system.doc);
 	
@@ -78,15 +78,15 @@ TestGame.Controller = function(system) {
                   e.webkitMovementY ||
                   0;
                   
-    thiz.thePlayer.personController.moveCamera(movementX, movementY);
+    thiz.thePlayer.personController.updatePitchYaw(movementX, movementY);
  
   // Print the mouse movement delta values
   //console.log("movementX=" + movementX, "movementY=" + movementY);
-}, false);
+	}, false);
 };
 TestGame.Controller.prototype.process = function() {
 	// preprocess players
-	this.thePlayer.preProcess();
+	this.thePlayer.preProcess(this.mouse);
 	
 	// jump
 	if (this.keys.isKeyPressed(GLGE.KI_SPACE)) {
@@ -144,9 +144,11 @@ TestGame.FirstPersonController = function(scene, doc) {
 	this.camera = this.scene.camera;
 	this.camera.setLoc(0, 0, 45);
 	this.camera.setRot(1.5, 0, 0);
-	this.rotX = 1.5;
-	this.rotY = 0;
-	this.rotZ = 0;
+	
+	this.now = 0;
+	this.lasttime = parseInt(new Date().getTime());
+	this.yaw = 0; // TOP -0.38; DOWN 0.41
+	this.pitch = 0;
 }
 TestGame.FirstPersonController.prototype = new TestGame.IPersonController();
 TestGame.FirstPersonController.prototype.jump = function() {};
@@ -157,33 +159,49 @@ TestGame.FirstPersonController.prototype.standIfWalkBack = function() {};
 TestGame.FirstPersonController.prototype.turnLeft = function() {};
 TestGame.FirstPersonController.prototype.turnRight = function() {};
 TestGame.FirstPersonController.prototype.standIfTurn = function() {};
-TestGame.FirstPersonController.prototype.preProcess = function() {};
+TestGame.FirstPersonController.prototype.preProcess = function() {
+	this.now=parseInt(new Date().getTime());
+};
 TestGame.FirstPersonController.prototype.process = function() {
 	//this.camera.setRot(this.rotX, this.rotY, 0);
+	this.lasttime = this.now;
 };
-TestGame.FirstPersonController.prototype.moveCamera = function(x, y) {
+TestGame.FirstPersonController.prototype.updatePitchYaw = function(x, y) {
+	this.pitch -= x/300;
+	this.yaw += y/300;
+	if (this.yaw < -0.38) this.yaw = -0.38;
+	else if (this.yaw > 0.41) this.yaw = 0.41;
+};
+TestGame.FirstPersonController.prototype.cameraMove = function(mouse) {
 	
-		x=x-document.getElementById("container").offsetLeft;
-		y=y-document.getElementById("container").offsetTop;
+		var mousepos=mouse.getMousePosition();
+		mousepos.x=mousepos.x-document.getElementById("container").offsetLeft;
+		mousepos.y=mousepos.y-document.getElementById("container").offsetTop;
 		
-		camerarot=this.camera.getRotation();
-		inc=(y-(document.getElementById('canvas').offsetHeight/2))/500;
-		var trans=GLGE.mulMat4Vec4(this.camera.getRotMatrix(),[0,0,-1,1]);
+		var camera=this.camera;
+		camerarot=camera.getRotation();
+		//inc=(mousepos.y-(document.getElementById('canvas').offsetHeight/2))/500;
+		inc = this.yaw;
+		//console.log(inc);
+		var trans=GLGE.mulMat4Vec4(camera.getRotMatrix(),[0,0,-1,1]);
 		var mag=Math.pow(Math.pow(trans[0],2)+Math.pow(trans[1],2),0.5);
 		trans[0]=trans[0]/mag;
 		trans[1]=trans[1]/mag;
-		this.camera.setRotX(1.56-trans[1]*inc);
-		this.camera.setRotZ(-trans[0]*inc);
+		camera.setRotX(1.56-trans[1]*inc);
+		camera.setRotZ(-trans[0]*inc);
+		/*
 		var width=document.getElementById('canvas').offsetWidth;
-		if(x<width*0.3){
-			var turn=Math.pow((x-width*0.3)/(width*0.3),2)*0.005*0.1;
-			this.camera.setRotY(camerarot.y+turn);
+		if(mousepos.x<width*0.3){
+			var turn=Math.pow((mousepos.x-width*0.3)/(width*0.3),2)*0.005*(this.now-this.lasttime);
+			camera.setRotY(camerarot.y+turn);
 		}
-		if(x>width*0.7){
-			var turn=Math.pow((x-width*0.7)/(width*0.3),2)*0.005*0.1;
-			this.camera.setRotY(camerarot.y-turn);
+		if(mousepos.x>width*0.7){
+			var turn=Math.pow((mousepos.x-width*0.7)/(width*0.3),2)*0.005*(this.now-this.lasttime);
+			camera.setRotY(camerarot.y-turn);
 		}
-	
+		*/
+		camera.setRotY(this.pitch);
+			
 	//this.rotX += 0.01;
 };
 
@@ -407,8 +425,9 @@ TestGame.ThePlayer.prototype.turnRight = function() {
 TestGame.ThePlayer.prototype.standIfTurn = function() {
 	this.personController.standIfTurn();
 };
-TestGame.ThePlayer.prototype.preProcess = function() {
+TestGame.ThePlayer.prototype.preProcess = function(mouse) {
 	this.personController.preProcess();
+	this.personController.cameraMove(mouse);
 };
 TestGame.ThePlayer.prototype.process = function() {
 	this.personController.process();
@@ -416,8 +435,7 @@ TestGame.ThePlayer.prototype.process = function() {
 
 
 // start
-TestGame.System();
-
+g = new TestGame.System();
 
 
 
