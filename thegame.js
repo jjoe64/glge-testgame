@@ -85,6 +85,11 @@ TestGame.Controller = function(system) {
 	}, false);
 };
 TestGame.Controller.prototype.process = function() {
+	// change perspective
+	if (this.keys.isKeyPressed(GLGE.KI_P)) {
+		this.thePlayer.changePerspective();
+	}
+	
 	// preprocess players
 	this.thePlayer.preProcess(this.mouse);
 	
@@ -403,6 +408,8 @@ TestGame.ThirdPersonController.prototype.preProcess = function() {
 		camera.Lookat([this.manpos[0], this.manpos[1], this.manpos[2]+7]);
 	}
 };
+TestGame.ThirdPersonController.prototype.cameraMove = function(mouse) {};
+TestGame.ThirdPersonController.prototype.updatePitchYaw = function(mouse) {};
 TestGame.ThirdPersonController.prototype.process = function() {
 	// wall collision detection
 	if (this.manvel[0]>0 || this.manvel[1]>0) {
@@ -460,8 +467,13 @@ TestGame.ThirdPersonController.prototype.process = function() {
  * The own Player
  */
 TestGame.ThePlayer = function(scene, doc) {
-	//this.personController = new TestGame.ThirdPersonController(scene, doc);
-	this.personController = new TestGame.FirstPersonController(scene, doc);
+	this.scene = scene;
+	this.doc = doc;
+	
+	this.firstPersonPerspective = new TestGame.FirstPersonController(scene, doc);
+	this.thirdPersonPerspective = null; // lazy
+	
+	this.personController = this.firstPersonPerspective;
 };
 TestGame.ThePlayer.prototype.jump = function() {
 	this.personController.jump();
@@ -493,6 +505,16 @@ TestGame.ThePlayer.prototype.preProcess = function(mouse) {
 };
 TestGame.ThePlayer.prototype.process = function() {
 	this.personController.process();
+};
+TestGame.ThePlayer.prototype.changePerspective = function() {
+	if (this.personController == this.firstPersonPerspective) {
+		if (this.thirdPersonPerspective == null) {
+			this.thirdPersonPerspective = new TestGame.ThirdPersonController(this.scene, this.doc);
+		}
+		this.personController = this.thirdPersonPerspective;
+	} else {
+		this.personController = this.firstPersonPerspective;
+	}
 };
 
 
