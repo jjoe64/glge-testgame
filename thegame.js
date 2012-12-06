@@ -90,29 +90,29 @@ TestGame.Controller.prototype.process = function() {
 	
 	// jump
 	if (this.keys.isKeyPressed(GLGE.KI_SPACE)) {
-		this.thePlayer.jump();
+		this.thePlayer.personController.jump();
 	}
 	
 	// move forward & stop
 	if (this.keys.isKeyPressed(GLGE.KI_UP_ARROW)) {
-		this.thePlayer.walk();
+		this.thePlayer.personController.walk();
 	} else {
-		this.thePlayer.standIfWalk();
+		this.thePlayer.personController.standIfWalk();
 	}
 
 	// move backward & stop
 	if (this.keys.isKeyPressed(GLGE.KI_DOWN_ARROW)) {
-		this.thePlayer.walkBack();
+		this.thePlayer.personController.walkBack();
 	} else {
-		this.thePlayer.standIfWalkBack();
+		this.thePlayer.personController.standIfWalkBack();
 	}
 	
 	if (this.keys.isKeyPressed(GLGE.KI_LEFT_ARROW)) {
-		this.thePlayer.turnLeft();
+		this.thePlayer.personController.turnLeft();
 	} else if(this.keys.isKeyPressed(GLGE.KI_RIGHT_ARROW)) {
-		this.thePlayer.turnRight();
+		this.thePlayer.personController.turnRight();
 	} else {
-		this.thePlayer.standIfTurn();
+		this.thePlayer.personController.standIfTurn();
 	}
 	
 	// process players
@@ -149,21 +149,83 @@ TestGame.FirstPersonController = function(scene, doc) {
 	this.lasttime = parseInt(new Date().getTime());
 	this.yaw = 0; // TOP -0.38; DOWN 0.41
 	this.pitch = 0;
+	
+	this.playervel=-1;
+	this.gravity=-98;
 }
 TestGame.FirstPersonController.prototype = new TestGame.IPersonController();
-TestGame.FirstPersonController.prototype.jump = function() {};
-TestGame.FirstPersonController.prototype.walk = function() {};
+TestGame.FirstPersonController.prototype.jump = function() {
+	if (this.playervel==0) this.playervel=35;
+};
+TestGame.FirstPersonController.prototype.walk = function() {
+	this.yinc=this.yinc+parseFloat(this.trans[1]);
+	this.xinc=this.xinc+parseFloat(this.trans[0]);
+};
 TestGame.FirstPersonController.prototype.standIfWalk = function() {};
-TestGame.FirstPersonController.prototype.walkBack = function() {};
+TestGame.FirstPersonController.prototype.walkBack = function() {
+	this.yinc=this.yinc-parseFloat(this.trans[1]);
+	this.xinc=this.xinc-parseFloat(this.trans[0]);
+};
 TestGame.FirstPersonController.prototype.standIfWalkBack = function() {};
-TestGame.FirstPersonController.prototype.turnLeft = function() {};
-TestGame.FirstPersonController.prototype.turnRight = function() {};
+TestGame.FirstPersonController.prototype.turnLeft = function() {
+	this.yinc=this.yinc+parseFloat(this.trans[0]);
+	this.xinc=this.xinc-parseFloat(this.trans[1]);
+};
+TestGame.FirstPersonController.prototype.turnRight = function() {
+	this.yinc=this.yinc-parseFloat(this.trans[0]);
+	this.xinc=this.xinc+parseFloat(this.trans[1]);
+};
 TestGame.FirstPersonController.prototype.standIfTurn = function() {};
 TestGame.FirstPersonController.prototype.preProcess = function() {
 	this.now=parseInt(new Date().getTime());
+	
+	// walk parameters
+	var mat=this.camera.getRotMatrix();
+	this.trans=GLGE.mulMat4Vec4(mat,[0,0,-1,1]);
+	var mag=Math.pow(Math.pow(this.trans[0],2)+Math.pow(this.trans[1],2),0.5);
+	this.trans[0]=this.trans[0]/mag;
+	this.trans[1]=this.trans[1]/mag;
+	this.yinc=0;
+	this.xinc=0;
 };
 TestGame.FirstPersonController.prototype.process = function() {
-	//this.camera.setRot(this.rotX, this.rotY, 0);
+	// walk
+	if (this.xinc!=0 || this.yinc!=0){
+		var camerapos=this.camera.getPosition();
+		var origin=[camerapos.x,camerapos.y,camerapos.z];
+			
+		this.dist2=this.scene.ray(origin,[-this.xinc,0,0]);
+		this.dist3=this.scene.ray(origin,[0,-this.yinc,0]);
+		if (this.dist2 == null || this.dist2.distance<5) this.xinc=0;
+		if (this.dist3 == null || this.dist3.distance<5) this.yinc=0;
+		if (this.xinc!=0 || this.yinc!=0){
+			this.camera.setLocY(camerapos.y+this.yinc*0.05*(this.now-this.lasttime));
+			this.camera.setLocX(camerapos.x+this.xinc*0.05*(this.now-this.lasttime));
+			if (this.playervel==0) this.playervel=0.001;
+		}
+	}
+	
+	// do the gravity
+	if (this.playervel!=0 || this.now%10==0){
+		this.playervel += this.gravity*(this.now-this.lasttime)/1000;
+		var camerapos=this.camera.getPosition();
+		var origin=[camerapos.x,camerapos.y,camerapos.z];
+		var ray=this.scene.ray(origin,[0,0,1]);
+		var dist=ray.distance;
+		var inc=this.playervel*(this.now-this.lasttime)/1000;
+		if(dist+inc<8){
+			inc=8-dist;
+			this.playervel=0;
+		};
+		if(inc<0.01&& inc>-0.01) inc=0;
+		if(!ray.object) {
+			inc=0;
+		} else if (ray.object.parent.animation) {
+			if (dist<10) this.playervel=11;
+		}
+		this.camera.setLocZ(camerapos.z+inc);
+	}
+	
 	this.lasttime = this.now;
 };
 TestGame.FirstPersonController.prototype.updatePitchYaw = function(x, y) {
@@ -488,6 +550,8 @@ function lockPointer() {
   // Start by going fullscreen with the element.  Current implementations
   // require the element to be in fullscreen before requesting pointer
   // lock--something that will likely change in the future.
+  elem.width = 1024;
+  elem.height = 600;
   elem.requestFullscreen = elem.requestFullscreen    ||
                            elem.mozRequestFullscreen ||
                            elem.mozRequestFullScreen || // Older API upper case 'S'.
